@@ -1,4 +1,3 @@
-from re import M, X
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,17 +22,19 @@ def dataloader(images, poses, focal, w, h):
     raise NotImplementedError
 
 class TinyDataset(Dataset):
-    def __init__(self, images, poses, focal, w, h, t_n, t_f):
+    def __init__(self, images, poses, focal, w, h, t_n, t_f, num_samples):
         self.images = images
         self.poses = poses
         self.focal = focal
         self.w, self.h = w, h
         self.t_n, self.t_f = t_n, t_f
+        self.num_samples = num_samples
 
     def __len__(self):
         return len(self.data_lst)
 
     def __getitem__(self, idx):
+        """"Generate samples along the ray through each pixel on the image[idx]."""
         image = self.images[idx]
         pose = self.poses[idx]
         rotation = pose[0:3, 0:3]
@@ -41,14 +42,29 @@ class TinyDataset(Dataset):
 
         # Sample pixels
 
-        xs = torch.linspace(-self.w/2, self.w/2, steps=self.w + 1)
-        ys = torch.linspace(-self.h/2, self.h/2, steps =self.h + 1)
-        W_mesh, H_mesh = torch.meshgrid(xs, ys)
+        xs = torch.linspace(-self.w//2 + 1, self.w//2, steps=self.w)
+        ys = torch.linspace(-self.h//2 + 1, self.h//2, steps=self.h)
+        h_mesh, w_mesh = torch.meshgrid(xs, ys, indexing='ij')
+        z_mesh = -torch.ones_like(h_mesh) * self.focal
+        
+        pixels = torch.stack([h_mesh, w_mesh, z_mesh], dim=-1)
+        pixels = torch.reshape(pixels, (self.h*self.w, 3))    
+        rgbs = torch.reshape(torch.tensor(image), (self.h*self.w, 3))
 
-        print(W_mesh)
-        print(H_mesh)
-        image = ToTensor()(image)
-        return image
+
+        dirs = torch.matmul(torch.tensor(rotation), pixels.T).T
+        dirs = torch.nn.functional.normalize(dirs, dim=1)
+
+        origin = torch.tensor(translation)
+
+        ts = torch.linspace(self.t_n, self.t_f, steps=self.num_samples)
+
+        ray_points = torch.stack([origin + dirs*t for t in ts], axis = 0).permute(1, 0, 2)
+
+        # ray_points is of shape [num_pixels, num_samples, 3]
+        
+        dirs = torch.unsqueeze(dirs, dim=1).repeat(1, self.num_samples, 1)
+        return ray_points, dirs, rgbs
 
 
 if __name__ == '__main__':
@@ -61,20 +77,12 @@ if __name__ == '__main__':
     translation = pose[0:3, 3]
 
     # Sample pixels
-    print(w, h)
     xs = torch.linspace(-w//2 + 1, w//2, steps=w)
     ys = torch.linspace(-h//2 + 1, h//2, steps=h)
     h_mesh, w_mesh = torch.meshgrid(xs, ys)
 
     
     z_mesh = -torch.ones_like(h_mesh) * focal
-    
-
-    # print(h_mesh)
-    # print("-----------------------------------------------------------")
-    # print(w_mesh)
-    # print("-----------------------------------------------------------")
-    # print(z_mesh)
 
     pixels = torch.stack([h_mesh, w_mesh, z_mesh], dim=-1)
     
@@ -111,3 +119,18 @@ if __name__ == '__main__':
     print(ts)
 
     print(torch.stack([origin + dirs*t for t in ts], axis = 0).permute(1, 0, 2).shape)
+    print(rgbs.shape)
+    # (10000, 100, 3) -> (10000 * 100, 3)
+    # (10000*100, 3) -> (10000*100, 4) -> (10000, 100, 4) -> (10000, 3)
+    # run on N images -> wait, don't update gradients -> update after N are done
+    # Dataloader will give us the rays for one image at a time -> run on network -> do above
+
+    # optimizer.step() updates gradients, we don't want to do this until it is time
+    # more images means better approximation of true gradient
+
+    # Get image -> compute rendered image -> loss -> repeat and at the end do optimizer.step()
+    # (B ,)
+    # N images, 10000 pixels
+    # (N*10000, 100, 3)
+    # (B, 6)
+    # N*10000/32 -> ((32, 100), 3) generate the estimated pixel value
