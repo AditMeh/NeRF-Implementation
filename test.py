@@ -9,11 +9,17 @@ from torch.utils.data import DataLoader
 
 from dataloader import TinyDataset, load_data
 from model import NerfModel
+from rendering import rendering
 
 
 if __name__ == "__main__":
 
     images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
+
+    print(images.shape)
+    print(images[:100, ...].shape)
+    print(images[:100, :, :, :3].shape)
+    exit()
 
     idx = 0
     image =images[idx]
@@ -21,7 +27,11 @@ if __name__ == "__main__":
     rotation = pose[0:3, 0:3]
     translation = pose[0:3, 3]
 
-    dataset = TinyDataset(images, poses, focal, w, h, 3, 6, 100)
+    near = 3
+    far = 6
+    samples_num = 100
+
+    dataset = TinyDataset(images, poses, focal, w, h, near, far, samples_num)
 
     points, directions, rgbs = dataset[idx]
 
@@ -33,5 +43,22 @@ if __name__ == "__main__":
     directions = points.reshape(directions.shape[0] * directions.shape[1], 3)
     print(points.shape, directions.shape)
 
-    print(nerf_model(points, directions)[0].shape, 
-    nerf_model(points, directions)[1].shape)
+    rgbs, density = nerf_model(points, directions)
+
+    print('rgb:', rgbs.shape, '\n density:', density.shape)
+
+    # reshape
+    total_points = rgbs.shape[0]
+    pixels_num = int(total_points / samples_num)
+    rgbs = torch.reshape(rgbs, (pixels_num, samples_num, 3))
+    density = torch.reshape(rgbs, (pixels_num, samples_num, 3))
+
+    # rendering
+    delta = (far - near) / samples_num
+    C = rendering(rgbs, density, delta)
+    print('C:', C)
+
+    f, axarr = plt.subplots(1,1)
+
+    axarr.imshow(torch.reshape(rgbs, (h, w, 3)).detach().numpy())
+    plt.show()

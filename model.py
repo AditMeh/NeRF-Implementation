@@ -67,7 +67,6 @@ class NerfModel(nn.Module):
         return rgb, density
 
 
-    
 if __name__ == "__main__":
 
     nerf_model = NerfModel(3, 3)
@@ -75,7 +74,6 @@ if __name__ == "__main__":
     points = torch.ones(size= (10000, 3))
 
     direction_vectors = torch.ones(size=(10000, 3))
-
 
     print(nerf_model(points, direction_vectors)[0].shape, 
     nerf_model(points, direction_vectors)[1].shape)
