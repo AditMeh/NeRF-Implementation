@@ -1,3 +1,4 @@
+from logging import LogRecord
 import torch
 from torch import nn
 import numpy as np
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 from dataloader import TinyDataset, load_data
 from model import NerfModel
 from rendering import rendering
+import tqdm
 
 
 if __name__ == "__main__":
@@ -19,7 +21,6 @@ if __name__ == "__main__":
     print(images.shape)
     print(images[:100, ...].shape)
     print(images[:100, :, :, :3].shape)
-    exit()
 
     idx = 0
     image =images[idx]
@@ -56,9 +57,36 @@ if __name__ == "__main__":
     # rendering
     delta = (far - near) / samples_num
     C = rendering(rgbs, density, delta)
-    print('C:', C)
+    print('C:', C.shape)
 
-    f, axarr = plt.subplots(1,1)
+    # f, axarr = plt.subplots(1,1)
 
-    axarr.imshow(torch.reshape(rgbs, (h, w, 3)).detach().numpy())
-    plt.show()
+    # axarr.imshow(torch.reshape(rgbs, (h, w, 3)).detach().numpy())
+    # plt.show()
+
+    epochs = 10
+    lr = 1e-3
+    optimizer = torch.optim.Adam(nerf_model.parameters(), lr=lr)
+    for epoch in tqdm.tqdm(range(epochs)):
+        rgbs, density = nerf_model(points, directions)
+        total_points = rgbs.shape[0]
+        pixels_num = int(total_points / samples_num)
+        rgbs = torch.reshape(rgbs, (pixels_num, samples_num, 3))
+        density = torch.reshape(rgbs, (pixels_num, samples_num, 3))
+
+        # rendering
+        delta = (far - near) / samples_num
+        C = rendering(rgbs, density, delta)
+
+        rendered_img = torch.reshape(C, (h, w, 3))
+
+        mse = nn.MSELoss(reduction='sum')(torch.tensor(image), rendered_img)
+        print('\nepoch', epoch + 1, ': ', mse)
+        optimizer.zero_grad()
+        mse.backward()
+        optimizer.step()
+
+    # f, axarr = plt.subplots(1,1)
+
+    # axarr.imshow(torch.reshape(C, (h, w, 3)).detach().numpy())
+    # plt.show()
