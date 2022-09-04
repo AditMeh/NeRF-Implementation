@@ -18,11 +18,6 @@ def load_data(file):
 
     return images, poses, focal, w, h
 
-
-def dataloader(images, poses, focal, w, h):
-    raise NotImplementedError
-
-
 class TinyDataset(Dataset):
     def __init__(self, images, poses, focal, w, h, t_n, t_f, num_samples):
         self.images = images
@@ -44,26 +39,26 @@ class TinyDataset(Dataset):
 
         # Sample pixels
 
-        xs = torch.linspace(-self.w//2 + 1, self.w//2, steps=self.w)
-        ys = torch.linspace(-self.h//2 + 1, self.h//2, steps=self.h)
+        xs = torch.arange(self.w)
+        ys = torch.arange(self.h)
+
         h_mesh, w_mesh = torch.meshgrid(xs, ys, indexing='ij')
 
-        pixels_unflatten = torch.stack(
-            [h_mesh / self.focal, -w_mesh / self.focal, -torch.ones_like(h_mesh)], dim=-1)
+        pixels_unflatten = torch.stack([(w_mesh - self.w * .5) / self.focal, -(
+            h_mesh - self.h * .5) / self.focal, -torch.ones_like(h_mesh)], dim=-1)
         pixels = torch.reshape(pixels_unflatten, (self.h*self.w, 3))
 
         dirs = torch.matmul(torch.tensor(rotation), pixels.T).T
-
-        dirs_unflattened = torch.reshape(pixels_unflatten, (self.h, self.w, 3))
+        dirs_tformed = torch.reshape(dirs, (self.h, self.w, 3))
 
         origin = torch.broadcast_to(torch.tensor(
-            translation), dirs_unflattened.shape)
-
+            translation), dirs_tformed.shape)
+        
         ts = torch.linspace(self.t_n, self.t_f, steps=self.num_samples)
 
         #                      (100, 100, 1, 3)       (100, 100, 1, 3)     (100, 1)
         ray_points = origin[..., None, :] + \
-            dirs_unflattened[..., None, :] * ts[:, None]
+            dirs_tformed[..., None, :] * ts[:, None]
 
         # ray_points is of shape [num_pixels, num_samples, 3]
 
