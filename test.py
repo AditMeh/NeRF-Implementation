@@ -1,4 +1,3 @@
-from logging import LogRecord
 import torch
 from torch import nn
 import numpy as np
@@ -18,10 +17,6 @@ if __name__ == "__main__":
 
     images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
 
-    print(images.shape)
-    print(images[:100, ...].shape)
-    print(images[:100, :, :, :3].shape)
-
     idx = 0
     image =images[idx]
     pose = poses[idx]
@@ -34,45 +29,17 @@ if __name__ == "__main__":
 
     dataset = TinyDataset(images, poses, focal, w, h, near, far, samples_num)
 
-    points, directions, rgbs = dataset[idx]
+    points = dataset[idx]
 
-    print(points.shape, directions.shape, rgbs.shape)
+    nerf_model = NerfModel(3)
 
-    nerf_model = NerfModel(3, 3)
-
-    points = points.reshape(points.shape[0] * points.shape[1], 3)
-    directions = points.reshape(directions.shape[0] * directions.shape[1], 3)
-    print(points.shape, directions.shape)
-
-    rgbs, density = nerf_model(points, directions)
-
-    print('rgb:', rgbs.shape, '\n density:', density.shape)
-
-    # reshape
-    total_points = rgbs.shape[0]
-    pixels_num = int(total_points / samples_num)
-    rgbs = torch.reshape(rgbs, (pixels_num, samples_num, 3))
-    density = torch.reshape(rgbs, (pixels_num, samples_num, 3))
-
-    # rendering
-    delta = (far - near) / samples_num
-    C = rendering(rgbs, density, delta)
-    print('C:', C.shape)
-
-    # f, axarr = plt.subplots(1,1)
-
-    # axarr.imshow(torch.reshape(rgbs, (h, w, 3)).detach().numpy())
-    # plt.show()
-
-    epochs = 10
+    epochs = 40
     lr = 1e-3
     optimizer = torch.optim.Adam(nerf_model.parameters(), lr=lr)
     for epoch in tqdm.tqdm(range(epochs)):
-        rgbs, density = nerf_model(points, directions)
+        rgbs, density = nerf_model(points)
         total_points = rgbs.shape[0]
         pixels_num = int(total_points / samples_num)
-        rgbs = torch.reshape(rgbs, (pixels_num, samples_num, 3))
-        density = torch.reshape(rgbs, (pixels_num, samples_num, 3))
 
         # rendering
         delta = (far - near) / samples_num
@@ -86,7 +53,7 @@ if __name__ == "__main__":
         mse.backward()
         optimizer.step()
 
-    # f, axarr = plt.subplots(1,1)
+    f, axarr = plt.subplots(1,1)
 
-    # axarr.imshow(torch.reshape(C, (h, w, 3)).detach().numpy())
-    # plt.show()
+    axarr.imshow(torch.reshape(C, (h, w, 3)).detach().numpy())
+    plt.show()
