@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     near = 3
     far = 6
-    samples_num = 100
+    samples_num = 30
 
     dataset = TinyDataset(images, poses, focal, w, h, near, far, samples_num)
 
