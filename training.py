@@ -35,17 +35,15 @@ def train(data_file, near, far, freq_num, samples_num, epochs, lr):
         rgbs, density = nerf_model(points)
         # rendering
         delta = (far - near) / samples_num
-        C = rendering(rgbs, density, delta)
+        C = rendering(rgbs, density, delta, device)
 
         rendered_img = torch.reshape(C, (h, w, 3))
 
         mse = nn.MSELoss(reduction='sum')(torch.tensor(image), rendered_img)
-        print('\nepoch', epoch + 1, ': ', mse)
+        print('\nepoch', epoch + 1, ': ', mse.item())
         optimizer.zero_grad()
         mse.backward()
         optimizer.step()
-
-        print('rendered: ', torch.min(rendered_img), torch.max(rendered_img))
 
     torch.save(nerf_model, "model.pt")
     f, axarr = plt.subplots(1, 1)

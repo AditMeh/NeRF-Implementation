@@ -33,7 +33,7 @@ class TinyDataset(Dataset):
         self.num_samples = num_samples
 
     def __len__(self):
-        return len(self.data_lst)
+        return self.images.shape[0]
 
     def __getitem__(self, idx):
         """"Generate samples along the ray through each pixel on the image[idx]."""

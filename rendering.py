@@ -10,6 +10,8 @@ def rendering(color, density, dist_delta, device):
     """
     delta_broadcast = torch.ones(density.shape[-1]) * dist_delta
     delta_broadcast[-1] = 1e10
+    delta_broadcast = delta_broadcast.to(device=device)
+
     density_times_delta = density * delta_broadcast
     density_times_delta = density_times_delta.to(device=device)
 
