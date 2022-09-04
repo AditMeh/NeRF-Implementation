@@ -63,3 +63,5 @@ if __name__ == "__main__":
     lr = 5e-4
 
     data_file = 'tiny_nerf_data.npz'
+
+    train(data_file, near, far, freq_num, samples_num, epochs, lr)
