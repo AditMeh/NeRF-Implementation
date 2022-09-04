@@ -1,6 +1,7 @@
 import torch
 
-def rendering(color, density, dist_delta):
+
+def rendering(color, density, dist_delta, device):
     """
     color: (h, w, num_samples along each ray, 3)
     density: (h, w, num_samples along each ray)
@@ -10,12 +11,11 @@ def rendering(color, density, dist_delta):
     delta_broadcast = torch.ones(density.shape[-1]) * dist_delta
     delta_broadcast[-1] = 1e10
     density_times_delta = density * delta_broadcast
-    
+    density_times_delta = density_times_delta.to(device=device)
 
     dists = torch.ones(density.shape[-1]) * dist_delta
     dists[-1] = 1e10
     density_times_delta = density * dist_delta
-
 
     T = torch.exp(-cumsum_exclusive(density_times_delta))
     # roll T to right by one postion and replace the first column with 1
@@ -25,12 +25,14 @@ def rendering(color, density, dist_delta):
 
     return C
 
+
 def cumsum_exclusive(t):
     dim = -1
     cumsum = torch.cumsum(t, dim)
     cumsum = torch.roll(cumsum, 1, dim)
     cumsum[..., 0] = 0.
     return cumsum
+
 
 def cumprod_exclusive(t):
     dim = -1
@@ -39,8 +41,9 @@ def cumprod_exclusive(t):
     cumprod[..., 0] = 1.
     return cumprod
 
+
 if __name__ == "__main__":
-    c = torch.clip(torch.randn((100, 100, 64, 3)), min=0.01, max= 0.99)
+    c = torch.clip(torch.randn((100, 100, 64, 3)), min=0.01, max=0.99)
     d = torch.clip(torch.randn((100, 100, 64)), min=0.01)
     dist = 100
 

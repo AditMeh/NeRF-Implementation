@@ -6,6 +6,7 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 
+
 def load_data(file):
     data = np.load('tiny_nerf_data.npz')
 
@@ -20,6 +21,7 @@ def load_data(file):
 
 def dataloader(images, poses, focal, w, h):
     raise NotImplementedError
+
 
 class TinyDataset(Dataset):
     def __init__(self, images, poses, focal, w, h, t_n, t_f, num_samples):
@@ -40,32 +42,34 @@ class TinyDataset(Dataset):
         rotation = pose[0:3, 0:3]
         translation = pose[0:3, 3]
 
-        
         # Sample pixels
 
         xs = torch.linspace(-self.w//2 + 1, self.w//2, steps=self.w)
         ys = torch.linspace(-self.h//2 + 1, self.h//2, steps=self.h)
         h_mesh, w_mesh = torch.meshgrid(xs, ys, indexing='ij')
-        
-        pixels_unflatten = torch.stack([h_mesh / self.focal, -w_mesh / self.focal, -torch.ones_like(h_mesh)], dim=-1)
-        pixels = torch.reshape(pixels_unflatten, (self.h*self.w, 3))    
+
+        pixels_unflatten = torch.stack(
+            [h_mesh / self.focal, -w_mesh / self.focal, -torch.ones_like(h_mesh)], dim=-1)
+        pixels = torch.reshape(pixels_unflatten, (self.h*self.w, 3))
 
         dirs = torch.matmul(torch.tensor(rotation), pixels.T).T
 
-        dirs_unflattened = torch.reshape(pixels_unflatten, (self.h, self.w, 3)) 
+        dirs_unflattened = torch.reshape(pixels_unflatten, (self.h, self.w, 3))
 
-        origin = torch.broadcast_to(torch.tensor(translation), dirs_unflattened.shape)
+        origin = torch.broadcast_to(torch.tensor(
+            translation), dirs_unflattened.shape)
 
         ts = torch.linspace(self.t_n, self.t_f, steps=self.num_samples)
 
-        #                      (100, 100, 1, 3)       (100, 100, 1, 3)     (100, 1)       
-        ray_points = origin[..., None, :] + dirs_unflattened[..., None, :] * ts[:, None]
+        #                      (100, 100, 1, 3)       (100, 100, 1, 3)     (100, 1)
+        ray_points = origin[..., None, :] + \
+            dirs_unflattened[..., None, :] * ts[:, None]
 
         # ray_points is of shape [num_pixels, num_samples, 3]
-        
+
         # Come back to this later, once nerf works on plain (x,y,z) values.
         # dirs = torch.unsqueeze(dirs, dim=1).repeat(1, self.num_samples, 1)
-        return ray_points
+        return ray_points, torch.tensor(image)
 
 
 if __name__ == '__main__':
@@ -85,11 +89,10 @@ if __name__ == '__main__':
     # ys = torch.linspace(-h//2 + 1, h//2, steps=h)
     # h_mesh, w_mesh = torch.meshgrid(xs, ys)
 
-    
     # z_mesh = -torch.ones_like(h_mesh) * focal
 
     # pixels = torch.stack([h_mesh, w_mesh, z_mesh], dim=-1)
-    
+
     # """
     # data = [[x_1, y_1, z_1],
     #        [x_2, y_2, z_2],
@@ -110,7 +113,6 @@ if __name__ == '__main__':
 
     # pixels = torch.reshape(pixels, (h*w, 3))
     # rgbs = torch.reshape(torch.tensor(image), (h*w, 3))
-
 
     # dirs = torch.matmul(torch.tensor(rotation), pixels.T).T
     # dirs = torch.nn.functional.normalize(dirs, dim=1)

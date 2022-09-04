@@ -2,6 +2,7 @@ from cmath import sin
 from torch import nn
 import torch
 
+
 class NerfModel(nn.Module):
     def __init__(self, freq_num):
         super(NerfModel, self).__init__()
@@ -23,7 +24,7 @@ class NerfModel(nn.Module):
             nn.Linear(256, 256),
             nn.ReLU()
         )
-        
+
         # concatenate with the position vector
         self.model_2 = nn.Sequential(
             nn.Linear(256 + self.position_dim, 256),
@@ -32,7 +33,7 @@ class NerfModel(nn.Module):
             nn.ReLU(),
             nn.Linear(256, 256),
         )
-        
+
         # output density value
         self.density_head = nn.Sequential(
             nn.Linear(256, 1),
@@ -46,7 +47,7 @@ class NerfModel(nn.Module):
             nn.Linear(128, 3),
             nn.Sigmoid()
         )
-        
+
     def forward(self, position):
 
         flat_pos = position.reshape(-1, 3)
@@ -71,14 +72,15 @@ class NerfModel(nn.Module):
             cos_encoding = torch.cos(2 ** i * torch.pi * position)
             terms.append(sin_encoding)
             terms.append(cos_encoding)
-        
+
         return torch.concat(terms, dim=1)
+
 
 if __name__ == "__main__":
 
     nerf_model = NerfModel(6)
 
-    points = torch.ones(size= (100, 100, 100, 3))
+    points = torch.ones(size=(100, 100, 100, 3))
 
-    print(nerf_model(points)[0].shape, 
-    nerf_model(points)[1].shape)
+    print(nerf_model(points)[0].shape,
+          nerf_model(points)[1].shape)
