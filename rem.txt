@@ -1,4 +1,0 @@
--(j-H*.5)/focal
-
-
-- broadcast translation vector (origin) to the shape of the directon vectors

@@ -56,8 +56,8 @@ if __name__ == "__main__":
     near = 2
     far = 6
     freq_num = 6
-    samples_num = 64
-    epochs = 30
+    samples_num = 10
+    epochs = 100
     lr = 5e-4
 
     data_file = 'tiny_nerf_data.npz'
