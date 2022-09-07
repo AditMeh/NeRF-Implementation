@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def load_data(file):
@@ -56,7 +57,6 @@ class TinyDataset(Dataset):
         
         ts = torch.linspace(self.t_n, self.t_f, steps=self.num_samples)
 
-        #                      (100, 100, 1, 3)       (100, 100, 1, 3)     (100, 1)
         ray_points = origin[..., None, :] + \
             dirs_tformed[..., None, :] * ts[:, None]
 
@@ -70,68 +70,20 @@ class TinyDataset(Dataset):
 if __name__ == '__main__':
     images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
 
-    d = TinyDataset(images, poses, focal, w, h, 3, 6, 100)
+    d = TinyDataset(images, poses, focal, w, h, 3, 6, 30)
+    print(d[0][0].shape)
 
-    print(d[0].shape)
-    # idx = 0
-    # image =images[idx]
-    # pose = poses[idx]
-    # rotation = pose[0:3, 0:3]
-    # translation = pose[0:3, 3]
+    # rays = d[0][0].detach().cpu().numpy()
+    # x, z, y = rays[:, :, 0], rays[:, :, 1], rays[:, :, 2]
 
-    # # Sample pixels
-    # xs = torch.linspace(-w//2 + 1, w//2, steps=w)
-    # ys = torch.linspace(-h//2 + 1, h//2, steps=h)
-    # h_mesh, w_mesh = torch.meshgrid(xs, ys)
+    # x, z, y = np.reshape(x, -1), np.reshape(z, -1), np.reshape(y, -1)
 
-    # z_mesh = -torch.ones_like(h_mesh) * focal
+    # fig = plt.figure(figsize=(4,4))
 
-    # pixels = torch.stack([h_mesh, w_mesh, z_mesh], dim=-1)
+    # fig = plt.figure()
 
-    # """
-    # data = [[x_1, y_1, z_1],
-    #        [x_2, y_2, z_2],
-    #         ...
-    #        ]
+    # ax = fig.add_subplot(111, projection='3d')
 
-    # data = [x_1^T,
-    #         x_2^T,
-    #         ...]
-    # rotation = [[r_1, r_2 r_3],
-    #             [r_4, r_5, r_6],
-    #             [r_7, r_8, r_9]]
+    # ax.plot(x,y,z)
 
-    #   [[r_1, r_2 r_3],  [[x_1],
-    #   [r_4, r_5, r_6],  [x_2],
-    #   [r_7, r_8, r_9]]  [x_3]]
-    # """
-
-    # pixels = torch.reshape(pixels, (h*w, 3))
-    # rgbs = torch.reshape(torch.tensor(image), (h*w, 3))
-
-    # dirs = torch.matmul(torch.tensor(rotation), pixels.T).T
-    # dirs = torch.nn.functional.normalize(dirs, dim=1)
-
-    # origin = torch.tensor(translation)
-
-    # t_n, t_f = 2, 6
-    # num_samples = 100
-    # ts = torch.linspace(t_n, t_f, steps=num_samples)
-    # print(ts)
-
-    # print(torch.stack([origin + dirs*t for t in ts], axis = 0).permute(1, 0, 2).shape)
-    # print(rgbs.shape)
-    # # (10000, 100, 3) -> (10000 * 100, 3)
-    # # (10000*100, 3) -> (10000*100, 4) -> (10000, 100, 4) -> (10000, 3)
-    # # run on N images -> wait, don't update gradients -> update after N are done
-    # # Dataloader will give us the rays for one image at a time -> run on network -> do above
-
-    # # optimizer.step() updates gradients, we don't want to do this until it is time
-    # # more images means better approximation of true gradient
-
-    # # Get image -> compute rendered image -> loss -> repeat and at the end do optimizer.step()
-    # # (B ,)
-    # # N images, 10000 pixels
-    # # (N*10000, 100, 3)
-    # # (B, 6)
-    # # N*10000/32 -> ((32, 100), 3) generate the estimated pixel value
+    # plt.show()
