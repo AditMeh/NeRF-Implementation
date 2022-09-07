@@ -1,39 +1,30 @@
 import torch
 
-def rendering(color, density, dist_delta):
+
+def rendering(color, density, dist_delta, device):
     """
     color: (h, w, num_samples along each ray, 3)
     density: (h, w, num_samples along each ray)
     dist_delta: the distance between the two neighbouring points on a ray, 
                 assume it's constant and a float
     """
+    delta_broadcast = torch.ones(density.shape[-1]) * dist_delta
+    delta_broadcast[-1] = 1e10
+    delta_broadcast = delta_broadcast.to(device=device)
+
+    density_times_delta = density * delta_broadcast
+    density_times_delta = density_times_delta.to(device=device)
+
     dists = torch.ones(density.shape[-1]) * dist_delta
     dists[-1] = 1e10
-
     density_times_delta = density * dist_delta
 
-    S = 1. - torch.exp(-density_times_delta)
-
-    T = cumprod_exclusive(torch.exp(-density_times_delta))
-
-
+    T = torch.exp(-cumsum_exclusive(density_times_delta))
+    # roll T to right by one postion and replace the first column with 1
+    S = 1 - torch.exp(-density_times_delta)
     points_color = (T * S)[..., None] * color
-
     C = torch.sum(points_color, dim=-2)
 
-
-    # alpha = 1. - torch.exp(-density_times_delta) 
-    # weights = alpha * cumprod_exclusive(1.-alpha)
-    # rgb_map = torch.sum(weights[...,None] * color, dim=-2)
-
-    # print(torch.equal(C, rgb_map))
-
-    # c_list = list(torch.flatten(C).detach().numpy())
-    # r_list = list(torch.flatten(rgb_map).detach().numpy())
-
-    # for i, ele in enumerate(c_list):
-    #     if round(r_list[i], 5) != round(ele, 5):
-    #         print(r_list[i], ele)
     return C
 
 
@@ -51,9 +42,12 @@ def cumprod_exclusive(t):
     cumprod[..., 0] = 1.
     return cumprod
 
+
 if __name__ == "__main__":
-    c = torch.clip(torch.randn((100, 100, 30, 3)), min = 0.01, max = 0.99)
-    d = torch.clip(torch.randn((100, 100, 30)), min = 0.01)
+    c = torch.clip(torch.randn((100, 100, 64, 3)), min=0.01, max=0.99)
+    d = torch.clip(torch.randn((100, 100, 64)), min=0.01)
+    dist = 100
 
-
-    print(rendering(c, d, 4.).shape)
+    res = rendering(c, d, dist)
+    print(torch.unique(res))
+    print(res.shape)
