@@ -35,7 +35,6 @@ def cumsum_exclusive(t):
     cumsum[..., 0] = 0.
     return cumsum
 
-
 def cumprod_exclusive(t):
     dim = -1
     cumprod = torch.cumprod(t, dim)
