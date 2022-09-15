@@ -2,7 +2,7 @@
 
 This repository was worked by Junru Lin and Aditya Mehrotra.
 
-We implemented NeRF on the lego dataset. We did not implemented the hierarchical volume sampling or view direction.
+We implemented NeRF on the lego dataset. We did not implement the hierarchical volume sampling or view direction.
 
 Here are some visualization of our NeRF from different view points:
 
