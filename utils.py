@@ -1,5 +1,10 @@
 import torch
+import argparse
 
+def create_parser():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("config_path", help="path to NeRF hparam config", type=str)
+	return parser
 
 def pose_to_rays(rotation, translation, focal, h, w, t_n, t_f, num_samples):
     xs = torch.arange(w)

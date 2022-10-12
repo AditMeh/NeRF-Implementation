@@ -1,4 +1,3 @@
-from logging import LogRecord
 import torch
 from torch import nn
 import numpy as np
@@ -11,9 +10,10 @@ from torch.utils.data import DataLoader
 from dataloader import TinyDataset, load_data
 from model import NerfModel
 from rendering import rendering
+from utils import create_parser
 import tqdm
 import random
-
+import json
 
 def train(data_file, near, far, freq_num, samples_num, epochs, lr):
     device = (torch.device('cuda') if torch.cuda.is_available()
@@ -40,10 +40,11 @@ def train(data_file, near, far, freq_num, samples_num, epochs, lr):
         rendered_img = torch.reshape(C, (h, w, 3))
 
         mse = nn.MSELoss(reduction='sum')(torch.tensor(image), rendered_img)
-        print('\nepoch', epoch + 1, ': ', mse.item())
+#        print('\nepoch', epoch + 1, ': ', mse.item())
         optimizer.zero_grad()
         mse.backward()
         optimizer.step()
+
 
     torch.save(nerf_model, "model.pt")
     f, axarr = plt.subplots(1, 1)
@@ -53,13 +54,11 @@ def train(data_file, near, far, freq_num, samples_num, epochs, lr):
 
 
 if __name__ == "__main__":
-    near = 2
-    far = 6
-    freq_num = 6
-    samples_num = 64
-    epochs = 30
-    lr = 5e-4
+	parser = create_parser()	
+	args = parser.parse_args()	
 
-    data_file = 'tiny_nerf_data.npz'
-
-    train(data_file, near, far, freq_num, samples_num, epochs, lr)
+	with open(args.config_path) as json_file:
+		hparams = json.load(json_file)
+    
+	data_file = 'tiny_nerf_data.npz'
+	train(data_file, **hparams)
