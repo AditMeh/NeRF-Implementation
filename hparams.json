@@ -1,8 +1,8 @@
 {
 	"near":2,
 	"far":6,
- 	"freq_num":6,
- 	"samples_num":64,
- 	"epochs":30,
- 	"lr":0.005
+ 	"freq_num":8,
+ 	"samples_num":128,
+ 	"epochs":6000,
+ 	"lr":5e-4
 }

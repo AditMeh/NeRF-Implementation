@@ -75,6 +75,71 @@ class NerfModel(nn.Module):
 
         return torch.concat(terms, dim=1)
 
+class ReplicateNeRFModel(torch.nn.Module):
+    r"""NeRF model that follows the figure (from the supp. material of NeRF) to
+    every last detail. (ofc, with some flexibility)
+    """
+
+    def __init__(
+        self,
+        hidden_size=256,
+        num_layers=4,
+        num_freqs_xyz=8,
+        num_freqs_dir=6,
+    ):
+        super(ReplicateNeRFModel, self).__init__()
+        # xyz_encoding_dims = 3 + 3 * 2 * num_encoding_functions
+        self.num_freqs_xyz = num_freqs_xyz
+        self.num_freqs_dir = num_freqs_dir
+
+        self.dim_xyz = 3 + 2 * 3 * num_freqs_xyz
+        self.dim_dir = 3 + 2 * 3 * num_freqs_dir
+
+        self.layer1 = torch.nn.Linear(self.dim_xyz, hidden_size)
+        self.layer2 = torch.nn.Linear(hidden_size, hidden_size)
+        self.layer3 = torch.nn.Linear(hidden_size, hidden_size)
+        self.fc_alpha = torch.nn.Linear(hidden_size, 1)
+
+        self.layer4 = torch.nn.Linear(hidden_size + self.dim_dir, hidden_size // 2)
+        self.layer5 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
+        self.fc_rgb = torch.nn.Linear(hidden_size // 2, 3)
+        self.relu = torch.nn.functional.relu
+
+    def forward(self, position, dir):
+        xyz = position.reshape(-1, 3)
+        direction = dir.reshape(-1, 3)
+        
+        xyz = self.positional_encoding(xyz, self.num_freqs_xyz)
+        direction = self.positional_encoding(direction, self.num_freqs_dir)
+        
+        x_ = self.relu(self.layer1(xyz))
+        x_ = self.relu(self.layer2(x_))
+        feat = self.layer3(x_)
+        alpha = self.fc_alpha(x_)
+        y_ = self.relu(self.layer4(torch.cat((feat, direction), dim=-1)))
+        y_ = self.relu(self.layer5(y_))
+        rgb = self.fc_rgb(y_)
+        
+        return torch.reshape(rgb, position.shape), torch.reshape(alpha, dir.shape[0:-1])
+
+    @staticmethod
+    def positional_encoding(tensor, num_encoding_functions=6):
+        encoding = [tensor]
+        
+        frequency_bands = 2.0 ** torch.linspace(
+            0.0,
+            num_encoding_functions - 1,    
+            num_encoding_functions,
+            dtype=tensor.dtype,
+            device=tensor.device,
+        )
+
+        for freq in frequency_bands:
+            for func in [torch.sin, torch.cos]:
+                encoding.append(func(tensor * freq))
+
+        # Special case, for no positional encoding
+        return torch.cat(encoding, dim=-1) 
 
 if __name__ == "__main__":
 

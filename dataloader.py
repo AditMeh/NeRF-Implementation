@@ -37,16 +37,17 @@ class TinyDataset(Dataset):
         """"Generate samples along the ray through each pixel on the image[idx]."""
         image = self.images[idx]
         pose = self.poses[idx]
-        rotation = pose[0:3, 0:3]
-        translation = pose[0:3, 3]
+        rotation = torch.tensor(pose[0:3, 0:3])
+        translation = torch.tensor(pose[0:3, 3])
 
-        ray_points = pose_to_rays(rotation, translation, self.focal,
+        ray_points, dirs= pose_to_rays(rotation, translation, self.focal,
                                   self.h, self.w, self.t_n, self.t_f, self.num_samples)
-        return ray_points, torch.tensor(image)
+        return ray_points, dirs, torch.tensor(image).permute(2, 0, 1)
 
 
 if __name__ == '__main__':
     images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
 
-    d = TinyDataset(images, poses, focal, w, h, 3, 6, 30)
+    d = TinyDataset(images, poses, focal, w, h, 3, 6, 128)
     print(d[0][0].shape)
+    print(d[0][1].shape)

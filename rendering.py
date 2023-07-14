@@ -1,7 +1,7 @@
 import torch
 
 
-def rendering(color, density, dist_delta, device):
+def rendering(color, density, dist_delta, device, permute):
     """
     color: (h, w, num_samples along each ray, 3)
     density: (h, w, num_samples along each ray)
@@ -25,7 +25,7 @@ def rendering(color, density, dist_delta, device):
     points_color = (T * S)[..., None] * color
     C = torch.sum(points_color, dim=-2)
 
-    return C
+    return C.permute(2, 0, 1) if permute else C
 
 
 def cumsum_exclusive(t):
@@ -48,6 +48,6 @@ if __name__ == "__main__":
     d = torch.clip(torch.randn((100, 100, 64)), min=0.01)
     dist = 100
 
-    res = rendering(c, d, dist)
+    res = rendering(c, d, dist, "cpu")
     print(torch.unique(res))
     print(res.shape)
