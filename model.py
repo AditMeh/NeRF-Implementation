@@ -86,8 +86,11 @@ class ReplicateNeRFModel(torch.nn.Module):
         num_layers=4,
         num_freqs_xyz=8,
         num_freqs_dir=6,
+        use_viewdirs=True
     ):
         super(ReplicateNeRFModel, self).__init__()
+        
+        self.use_viewdirs = use_viewdirs
         # xyz_encoding_dims = 3 + 3 * 2 * num_encoding_functions
         self.num_freqs_xyz = num_freqs_xyz
         self.num_freqs_dir = num_freqs_dir
@@ -100,27 +103,38 @@ class ReplicateNeRFModel(torch.nn.Module):
         self.layer3 = torch.nn.Linear(hidden_size, hidden_size)
         self.fc_alpha = torch.nn.Linear(hidden_size, 1)
 
-        self.layer4 = torch.nn.Linear(hidden_size + self.dim_dir, hidden_size // 2)
+        if use_viewdirs == True:
+            self.layer4 = torch.nn.Linear(hidden_size + self.dim_dir, hidden_size // 2)
+        else:
+            self.layer4 = torch.nn.Linear(hidden_size, hidden_size // 2)
+        
         self.layer5 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
         self.fc_rgb = torch.nn.Linear(hidden_size // 2, 3)
         self.relu = torch.nn.functional.relu
 
-    def forward(self, position, dir):
+    def forward(self, position, dir=None):
         xyz = position.reshape(-1, 3)
-        direction = dir.reshape(-1, 3)
         
         xyz = self.positional_encoding(xyz, self.num_freqs_xyz)
-        direction = self.positional_encoding(direction, self.num_freqs_dir)
+        
+        if self.use_viewdirs:
+            direction = dir.reshape(-1, 3)
+            direction = self.positional_encoding(direction, self.num_freqs_dir)
         
         x_ = self.relu(self.layer1(xyz))
         x_ = self.relu(self.layer2(x_))
         feat = self.layer3(x_)
         alpha = self.fc_alpha(x_)
-        y_ = self.relu(self.layer4(torch.cat((feat, direction), dim=-1)))
+        
+        if self.use_viewdirs:
+            y_ = self.relu(self.layer4(torch.cat((feat, direction), dim=-1)))
+        else:
+            y_ = self.relu(self.layer4(feat))
+
         y_ = self.relu(self.layer5(y_))
         rgb = self.fc_rgb(y_)
-        
-        return torch.reshape(rgb, position.shape), torch.reshape(alpha, dir.shape[0:-1])
+
+        return torch.reshape(rgb, position.shape), torch.reshape(alpha, position.shape[0:-1])
 
     @staticmethod
     def positional_encoding(tensor, num_encoding_functions=6):
