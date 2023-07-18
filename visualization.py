@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 import matplotlib.pyplot as plt
 
-from model import NerfModel
+from model import NerfModel, ReplicateNeRFModel
 from rendering import rendering
 from utils import pose_to_rays, create_parser
 from dataloader import load_data
@@ -72,15 +72,19 @@ if __name__ == '__main__':
     device = (torch.device('cuda')
               if torch.cuda.is_available() else torch.device('cpu'))
 
-    images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
+    # images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
     dataset = BlenderDataset("lego", 100, 100, 2, 6, 128)
     focal, w, h = dataset.focal, 100, 100
 
-    nerf_model = torch.load("model.pt").to(device=device)
+    nerf_model = ReplicateNeRFModel(use_viewdirs=True
+                                    ).to(device=device)
+    
+    nerf_model.load_state_dict(torch.load("model.pt", map_location=device))
+
 
     imgs = []
-    camera_positions = circle_points(2, 5, 110)
-    for position in camera_positions:
+    camera_positions = circle_points(2, 5, 200)
+    for position in tqdm.tqdm(camera_positions):
         c2w = lookat(np.asarray([0, 0, 0]), position).type(torch.float32)
         intermediate = (255 * np.clip(show_view(c2w, focal, h,
                         w, **hparams), 0, 1)).astype(np.uint8)
