@@ -44,6 +44,7 @@ class BlenderDataset(torch.utils.data.Dataset):
             # The default h/w is 800x800, so use that to compute focal
             self.focal = .5 * 800 / \
                 np.tan(.5 * float(config['camera_angle_x']))
+            self.focal /= (800/w)
 
     def __len__(self):
         return len(self.frames)
