@@ -37,27 +37,49 @@ def find_free_port():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return str(s.getsockname()[1])
 
+def eval(nerf_model, hparams, rank, world_size):
+    # Distributed eval
+    with torch.no_grad():
+        device = f'cuda:{rank}'
+        loss_accum = 0
+        val_dataset = BlenderDataset(mode="val", **(hparams.__dict__))
+        
+        # Fetch idx from the sampler for each rank
+        val_sampler = list(iter(torch.utils.data.distributed.DistributedSampler(val_dataset, num_replicas=world_size, rank=rank)))
 
-def train(rank, world_size, data_file, hparams):
+        for _, idx in enumerate(val_sampler):
+            points, dirs, image = val_dataset[idx]
+            
+            points, dirs, image = points.to(device), dirs.to(device), image.to(device)
+            
+            rgbs, density = nerf_model(points, dirs)
+            
+            # rendering
+            delta = (hparams.t_f - hparams.t_n) / hparams.num_samples
+            rendered_image = rendering(rgbs, density, delta, device, permute=True)
+
+            mse = nn.MSELoss(reduction='sum')(image, rendered_image)
+            loss_accum += mse
+        return loss_accum
+    
+        
+
+def train(rank, world_size, hparams):
     
     device = f'cuda:{rank}'
     dist.init_process_group(backend='nccl', world_size=world_size, rank=rank)
-    # h, w = 100, 100
+    
+    dataset = BlenderDataset(mode="train", **(hparams.__dict__))
+    
+    nerf_model = ReplicateNeRFModel(use_viewdirs=hparams.use_viewdirs).to(device=device)
+    
+    if os.path.exists(f'model_{str(hparams.use_viewdirs)}.pt'):
 
-    # images, poses, focal, w, h = load_data(data_file)
-    # dataset = TinyDataset(images, poses, focal, w, h, hparams.near, hparams.far, hparams.samples_num)
-    
-    dataset = BlenderDataset("lego", 100, 100, 2, 6, 128)
-    
-    nerf_model = ReplicateNeRFModel(use_viewdirs=True).to(device=device)
-    
-    if os.path.exists("model.pt"):
-
-        nerf_model.load_state_dict(torch.load("model.pt"))
+        nerf_model.load_state_dict(torch.load(f'model_{w}x{h}_viewdir={str(hparams.use_viewdirs)}.pt'))
         
     nerf_model = nn.parallel.DistributedDataParallel(nerf_model, device_ids=[rank])
     optimizer = torch.optim.Adam(nerf_model.parameters(), lr=hparams.lr)
-    for epoch in range(hparams.epochs):
+    for epoch in range(1, hparams.epochs + 1):
         idx = random.randint(0, len(dataset) - 1)
         points, dirs, image = dataset[idx]
 
@@ -70,7 +92,7 @@ def train(rank, world_size, data_file, hparams):
         # rgbs, density = nerf_model(points)
 
         # rendering
-        delta = (hparams.far - hparams.near) / hparams.samples_num
+        delta = (hparams.t_f - hparams.t_n) / hparams.num_samples
         rendered_image = rendering(rgbs, density, delta, device, permute=True)
 
         mse = nn.MSELoss(reduction='sum')(image, rendered_image)
@@ -78,14 +100,19 @@ def train(rank, world_size, data_file, hparams):
         mse.backward()
         optimizer.step()
 
-        if rank == 0:
-            print('\nepoch', epoch + 1, ': ', mse.item())
 
-            torch.save(nerf_model.module.state_dict(), "model.pt")
+        if (epoch % hparams.log_every) == 0:            
             
-            torchvision.utils.save_image(rendered_image, "result.png")
-            # axarr.imshow(rendered_image.permute(1, 2, 0).detach().cpu().numpy())
-            # plt.savefig('result.png')
+            val_loss = eval(nerf_model, hparams, rank, world_size)
+
+            dist.reduce(val_loss, 0, op= torch.distributed.ReduceOp.AVG)
+
+            dist.barrier() 
+            
+            if rank == 0:
+                print(f'Epoch {epoch}, Val Loss {val_loss.item()}')
+                torch.save(nerf_model.module.state_dict(), f'model_{w}x{h}_viewdir={str(hparams.use_viewdirs)}.pt')    
+                torchvision.utils.save_image(rendered_image, "result.png")
 
 
 if __name__ == "__main__":
@@ -99,6 +126,5 @@ if __name__ == "__main__":
     os.environ['MASTER_ADDR'] = '127.0.0.1'
     os.environ['MASTER_PORT'] = find_free_port()
 
-    data_file = 'tiny_nerf_data.npz'
-    # train(data_file, **hparams)
-    mp.spawn(train, nprocs=world_size, args=(world_size, data_file, DictMap(hparams)))
+
+    mp.spawn(train, nprocs=world_size, args=(world_size, DictMap(hparams)))

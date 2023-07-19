@@ -16,7 +16,7 @@ from utils import pose_to_rays
 
 
 class BlenderDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset_name, w, h, t_n, t_f, num_samples):
+    def __init__(self, dataset_name, w, h, t_n, t_f, num_samples, mode, **_):
 
         self.w = w
         self.h = h
@@ -37,7 +37,7 @@ class BlenderDataset(torch.utils.data.Dataset):
         self.transforms = transforms.Compose(
             [transforms.Resize((w, h)), transforms.ToTensor()])
 
-        with open(f'{self.dataset_path}/transforms_train.json', 'r') as f:
+        with open(f'{self.dataset_path}/transforms_{mode}.json', 'r') as f:
             config = json.load(f)
             self.frames = config["frames"]
 

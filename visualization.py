@@ -73,7 +73,7 @@ if __name__ == '__main__':
               if torch.cuda.is_available() else torch.device('cpu'))
 
     # images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
-    dataset = BlenderDataset("lego", 100, 100, 2, 6, 128)
+    dataset = BlenderDataset(**hparams)
     focal, w, h = dataset.focal, 100, 100
 
     nerf_model = ReplicateNeRFModel(use_viewdirs=True

@@ -1,8 +1,12 @@
 {
-	"near":2,
-	"far":6,
- 	"freq_num":8,
- 	"samples_num":128,
- 	"epochs":6000,
- 	"lr":5e-4
+	"dataset_name": "lego",
+	"log_every": 10,
+	"use_viewdirs": false,
+	"t_n":2,
+	"t_f":6,
+ 	"num_samples":128,
+ 	"epochs":20000,
+ 	"lr":5e-4,
+	"w":100,
+	"h":100
 }
