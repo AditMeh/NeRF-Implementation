@@ -75,7 +75,7 @@ def train(rank, world_size, hparams):
     
     if os.path.exists(f'model_{str(hparams.use_viewdirs)}.pt'):
 
-        nerf_model.load_state_dict(torch.load(f'model_{w}x{h}_viewdir={str(hparams.use_viewdirs)}.pt'))
+        nerf_model.load_state_dict(torch.load(f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt'))
         
     nerf_model = nn.parallel.DistributedDataParallel(nerf_model, device_ids=[rank])
     optimizer = torch.optim.Adam(nerf_model.parameters(), lr=hparams.lr)
@@ -111,7 +111,7 @@ def train(rank, world_size, hparams):
             
             if rank == 0:
                 print(f'Epoch {epoch}, Val Loss {val_loss.item()}')
-                torch.save(nerf_model.module.state_dict(), f'model_{w}x{h}_viewdir={str(hparams.use_viewdirs)}.pt')    
+                torch.save(nerf_model.module.state_dict(), f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt')    
                 torchvision.utils.save_image(rendered_image, "result.png")
 
 
