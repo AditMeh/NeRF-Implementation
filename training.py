@@ -57,7 +57,7 @@ def eval(nerf_model, hparams, rank, world_size):
             loss_accum += mse
         return loss_accum
     
-        
+
 
 def train(rank, world_size, hparams):
     
@@ -68,13 +68,12 @@ def train(rank, world_size, hparams):
     
     nerf_model = ReplicateNeRFModel(use_viewdirs=hparams.use_viewdirs).to(device=device)
     
-    if os.path.exists(f'model_{str(hparams.use_viewdirs)}.pt'):
-
+    if os.path.exists(f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt'):
         nerf_model.load_state_dict(torch.load(f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt'))
         
     nerf_model = nn.parallel.DistributedDataParallel(nerf_model, device_ids=[rank])
     optimizer = torch.optim.Adam(nerf_model.parameters(), lr=hparams.lr)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
+    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose=True)
     
     for epoch in range(1, hparams.epochs + 1):
         idx = random.randint(0, len(dataset) - 1)
@@ -90,8 +89,11 @@ def train(rank, world_size, hparams):
 
         # rendering
         delta = (hparams.t_f - hparams.t_n) / hparams.num_samples
-        rendered_image = rendering(rgbs, density, delta, device, permute=True)
+        
+        # print(rgbs.shape, density.shape)
 
+        rendered_image = rendering(rgbs, density, delta, device, permute=True)
+        
         mse = nn.MSELoss(reduction='sum')(image, rendered_image)
         optimizer.zero_grad()
         mse.backward()
