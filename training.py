@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 import torchvision
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 import torch.multiprocessing as mp
 import torch.distributed as dist
@@ -15,17 +16,11 @@ from dataloader import TinyDataset, load_data
 from blender_datasets import BlenderDataset
 from model import *
 from rendering import rendering
-from utils import create_parser
+from utils import create_parser, DictMap
 import tqdm
 import random
 import json
 import os
-
-
-class DictMap():
-    def __init__(self, item):
-        for k, v in item.items():
-            setattr(self, k, v)
 
 def find_free_port():
     """ https://stackoverflow.com/questions/1365265/on-localhost-how-do-i-pick-a-free-port-number """
@@ -79,6 +74,8 @@ def train(rank, world_size, hparams):
         
     nerf_model = nn.parallel.DistributedDataParallel(nerf_model, device_ids=[rank])
     optimizer = torch.optim.Adam(nerf_model.parameters(), lr=hparams.lr)
+    scheduler = ReduceLROnPlateau(optimizer, 'min')
+    
     for epoch in range(1, hparams.epochs + 1):
         idx = random.randint(0, len(dataset) - 1)
         points, dirs, image = dataset[idx]
@@ -105,9 +102,9 @@ def train(rank, world_size, hparams):
             
             val_loss = eval(nerf_model, hparams, rank, world_size)
 
-            dist.reduce(val_loss, 0, op= torch.distributed.ReduceOp.AVG)
-
+            dist.all_reduce(val_loss, op = torch.distributed.ReduceOp.AVG)
             dist.barrier() 
+            scheduler.step(val_loss)
             
             if rank == 0:
                 print(f'Epoch {epoch}, Val Loss {val_loss.item()}')

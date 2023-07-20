@@ -2,14 +2,19 @@ import torch
 import argparse
 
 
+
 def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "config_path", help="path to NeRF hparam config", type=str)
     parser.add_argument(
-        "--world_size", help="number of gpus", type=int)
+        "--world_size", help="number of gpus", default=0, type=int)
     return parser
 
+class DictMap():
+    def __init__(self, item):
+        for k, v in item.items():
+            setattr(self, k, v)
 
 def sample_ts(t_n, t_f, num_samples):
     accum = []
