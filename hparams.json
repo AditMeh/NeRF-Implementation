@@ -1,12 +1,12 @@
 {
 	"dataset_name": "lego",
-	"log_every": 10,
+	"log_every": 100,
 	"use_viewdirs": false,
 	"t_n":2,
 	"t_f":6,
  	"num_samples":128,
- 	"epochs":20000,
- 	"lr":5e-4,
+ 	"epochs":40000,
+ 	"lr":5e-5,
 	"w":100,
 	"h":100
 }
