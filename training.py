@@ -41,20 +41,31 @@ def eval(nerf_model, hparams, rank, world_size):
         
         # Fetch idx from the sampler for each rank
         val_sampler = list(iter(torch.utils.data.distributed.DistributedSampler(val_dataset, num_replicas=world_size, rank=rank)))
+        random.shuffle(val_sampler)
 
         for _, idx in enumerate(val_sampler):
             points, dirs, image = val_dataset[idx]
             
+
             points, dirs, image = points.to(device), dirs.to(device), image.to(device)
             
-            rgbs, density = nerf_model(points, dirs)
+            flat_points = points.reshape(-1, 3)
+            flat_dirs = dirs.reshape(-1, 3)
             
+            concat = batchify(hparams.chunk, nerf_model)(flat_points, flat_dirs)
+            flat_rgbs, flat_density = concat[..., :3], concat[..., 3:]
+
+            rgbs, density = torch.reshape(flat_rgbs, points.shape), torch.reshape(flat_density, points.shape[0:-1])
+
             # rendering
             delta = (hparams.t_f - hparams.t_n) / hparams.num_samples
             rendered_image = rendering(rgbs, density, delta, device, permute=True)
 
             mse = nn.MSELoss(reduction='sum')(image, rendered_image)
             loss_accum += mse
+        
+        torchvision.utils.save_image(rendered_image, "result.png")
+        
         return loss_accum
     
 
@@ -91,14 +102,13 @@ def train(rank, world_size, hparams):
         delta = (hparams.t_f - hparams.t_n) / hparams.num_samples
         
         # print(rgbs.shape, density.shape)
-
+        
         rendered_image = rendering(rgbs, density, delta, device, permute=True)
         
         mse = nn.MSELoss(reduction='sum')(image, rendered_image)
         optimizer.zero_grad()
         mse.backward()
         optimizer.step()
-
 
         if (epoch % hparams.log_every) == 0:            
             
@@ -111,7 +121,17 @@ def train(rank, world_size, hparams):
             if rank == 0:
                 print(f'Epoch {epoch}, Val Loss {val_loss.item()}')
                 torch.save(nerf_model.module.state_dict(), f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt')    
-                torchvision.utils.save_image(rendered_image, "result.png")
+
+def batchify(chunk, mlp):
+    if chunk is None:
+        return self.mlp
+
+    def process_chunks(xyz, dirs):
+        assert len(xyz.shape) == len(dirs.shape)
+        assert [xyz.shape[i] == dirs.shape[i] for i in range(len(xyz.shape))]
+
+        return torch.cat([torch.cat(mlp(xyz[i:i+chunk], dirs[i:i+chunk]), dim=-1) for i in range(0, xyz.shape[0], chunk)], 0)
+    return process_chunks
 
 
 if __name__ == "__main__":

@@ -1,0 +1,14 @@
+{
+	"dataset_name": "lego",
+	"log_every": 100,
+	"use_viewdirs": true,
+	"t_n": 2,
+	"t_f": 6,
+	"num_samples": 128,
+	"num_rays": 10000,
+	"chunk": 25600,
+	"epochs": 20000,
+	"lr": 5e-3,
+	"w": 400,
+	"h": 400
+}
