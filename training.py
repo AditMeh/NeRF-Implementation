@@ -81,7 +81,8 @@ def train(rank, world_size, hparams):
     
     if os.path.exists(f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt'):
         nerf_model.load_state_dict(torch.load(f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt'))
-        
+        if rank == 0:
+            print("Loaded pretrained model!")
     nerf_model = nn.parallel.DistributedDataParallel(nerf_model, device_ids=[rank])
     optimizer = torch.optim.Adam(nerf_model.parameters(), lr=hparams.lr)
     scheduler = ReduceLROnPlateau(optimizer, 'min', verbose=True)
