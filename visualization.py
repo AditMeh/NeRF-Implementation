@@ -21,18 +21,27 @@ def get_rotation_and_translation(c2w):
     return c2w[:3, :3], c2w[:3, -1]
 
 
-def show_view(c2w, focal, h, w, t_n, t_f, num_samples, **_):
-    rot, trans = get_rotation_and_translation(c2w)
-    points, direction = pose_to_rays(
-        rot, trans, focal, h, w, t_n, t_f, num_samples)
+def show_view(c2w, focal, h, w, t_n, t_f, num_samples, chunk, **_):
+    with torch.no_grad():
+        rot, trans = get_rotation_and_translation(c2w)
+        points, direction = pose_to_rays(
+            rot, trans, focal, h, w, t_n, t_f, num_samples)
 
-    points, direction = points.to(device=device), direction.to(device)
+        points, dirs = points.to(device), direction.to(device)
+        
+        flat_points = points.reshape(-1, 3)
+        flat_dirs = dirs.reshape(-1, 3)
+        
+        concat = batchify(chunk, nerf_model)(flat_points, flat_dirs)
+        flat_rgbs, flat_density = concat[..., :3], concat[..., 3:]
 
-    rgbs, density = nerf_model(points, direction)
-    delta = (t_f - t_n) / num_samples
-    C = rendering(rgbs, density, delta, device, permute=False)
+        rgbs, density = torch.reshape(flat_rgbs, points.shape), torch.reshape(flat_density, points.shape[0:-1])
 
-    return C.detach().cpu().numpy()
+        # rendering
+        delta = (t_f - t_n) / num_samples
+        rendered_image = rendering(rgbs, density, delta, device, permute=False)
+
+    return rendered_image.detach().cpu().numpy()
 
 
 def lookat(origin, loc):
@@ -61,6 +70,16 @@ def circle_points(z, radius, num_points):
                         z]))
     return vals
 
+def batchify(chunk, mlp):
+    if chunk is None:
+        return self.mlp
+
+    def process_chunks(xyz, dirs):
+        assert len(xyz.shape) == len(dirs.shape)
+        assert [xyz.shape[i] == dirs.shape[i] for i in range(len(xyz.shape))]
+
+        return torch.cat([torch.cat(mlp(xyz[i:i+chunk], dirs[i:i+chunk]), dim=-1) for i in range(0, xyz.shape[0], chunk)], 0)
+    return process_chunks
 
 if __name__ == '__main__':
     parser = create_parser()
@@ -85,13 +104,14 @@ if __name__ == '__main__':
         f'model_{hparams.w}x{hparams.h}_viewdir={str(hparams.use_viewdirs)}.pt', map_location=device))
 
     imgs = []
-    camera_positions = circle_points(2, 5, 200)
+    camera_positions = circle_points(2, 5, 100)
     for position in tqdm.tqdm(camera_positions):
         c2w = lookat(np.asarray([0, 0, 0]), position).type(torch.float32)
         intermediate = (255 * np.clip(show_view(c2w, focal, **
                         hparams.__dict__), 0, 1)).astype(np.uint8)
 
-        imgs.append(cv2.resize(intermediate, (512, 512)))
-
+        # imgs.append(cv2.resize(intermediate, (512, 512)
+        imgs.append(intermediate)
+        
     f = f'video_{hparams.use_viewdirs}.mp4'
     imageio.mimwrite(f, imgs, fps=30, quality=7)
