@@ -1,7 +1,7 @@
 import torch
+import torch.distributed as dist
 
-
-def rendering(color, density, dist_delta, device, permute):
+def rendering(color, density, dist_delta, device, permute, rank = None):
     """
     color: (h, w, num_samples along each ray, 3)
     density: (h, w, num_samples along each ray)
@@ -11,19 +11,15 @@ def rendering(color, density, dist_delta, device, permute):
     
     if len(density.shape) == 3:
         density = torch.squeeze(density)
-        
-    delta_broadcast = torch.ones(density.shape[-1]) * dist_delta
-    delta_broadcast[-1] = 1e10
-    delta_broadcast = delta_broadcast.to(device=device)
 
-    density_times_delta = density * delta_broadcast
+    dist_delta[-1] = 1e10    
+    density_times_delta = density * dist_delta    
     density_times_delta = density_times_delta.to(device=device)
+    
 
-    dists = torch.ones(density.shape[-1]) * dist_delta
-    dists[-1] = 1e10
-    density_times_delta = density * dist_delta
 
     T = torch.exp(-cumsum_exclusive(density_times_delta))
+    
     # roll T to right by one postion and replace the first column with 1
     S = 1 - torch.exp(-density_times_delta)
     points_color = (T * S)[..., None] * color
