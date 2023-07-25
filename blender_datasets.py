@@ -61,13 +61,13 @@ class BlenderDataset(torch.utils.data.Dataset):
         R, t = trans_mat[:3, :3], torch.squeeze(trans_mat[:3, 3:])
 
         if self.mode == "train":
-            rays_points, rays_dirs, rand_ray_coords = pose_to_rays_sampled(
+            rays_points, rays_dirs, ts, rand_ray_coords = pose_to_rays_sampled(
                 R, t, self.focal, self.h, self.w, self.t_n, self.t_f, self.num_samples, self.num_rays)
         
-            return rays_points, rays_dirs, im[:, rand_ray_coords[:, 0], rand_ray_coords[:, 1]]
+            return rays_points, rays_dirs, ts, im[:, rand_ray_coords[:, 0], rand_ray_coords[:, 1]]
         
         elif self.mode in ["val", "test"]:
-            rays_points, rays_dirs = pose_to_rays(
+            rays_points, rays_dirs, ts = pose_to_rays(
                 R, t, self.focal, self.h, self.w, self.t_n, self.t_f, self.num_samples)
             
-            return rays_points, rays_dirs, im
+            return rays_points, rays_dirs, ts, im
