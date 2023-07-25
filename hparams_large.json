@@ -6,7 +6,7 @@
 	"t_f": 6,
 	"num_samples": 128,
 	"num_rays": 10000,
-	"chunk": 25600,
+	"chunk": 128000,
 	"epochs": 20000,
 	"lr": 5e-3,
 	"w": 400,
