@@ -48,7 +48,7 @@ def pose_to_rays(rotation, translation, focal, h, w, t_n, t_f, num_samples):
     ray_points = origin[..., None, :] + \
         dirs_tformed[..., None, :] * ts[:, None]
 
-    return ray_points, dirs_tformed[..., None, :].repeat(1, 1, num_samples, 1)
+    return ray_points, dirs_tformed[..., None, :].repeat(1, 1, num_samples, 1), ts
 
 
 def pose_to_rays_sampled(rotation, translation, focal, h, w, t_n, t_f, num_samples, num_rays):
@@ -80,7 +80,7 @@ def pose_to_rays_sampled(rotation, translation, focal, h, w, t_n, t_f, num_sampl
     # (num_rays, 3)
     origin = torch.broadcast_to(translation, sampled_dirs.shape)
 
-    ts = torch.linspace(t_n, t_f, steps=num_samples)
+    ts = sample_ts(t_n, t_f, num_samples)
 
     # (num_rays, 3) + (num_rays, 3) * (num_samples) = (num_rays, num_samples, 3)
     # (num_rays, None, 3) + (num_rays, None, 3) * (None, num_samples, None)
@@ -88,4 +88,4 @@ def pose_to_rays_sampled(rotation, translation, focal, h, w, t_n, t_f, num_sampl
     ray_points = origin[:, None, :] + \
         sampled_dirs[:, None, :] * ts[None, :, None]
 
-    return ray_points, torch.broadcast_to(sampled_dirs[:, None, :], ray_points.shape), rand_ray_coords
+    return ray_points, torch.broadcast_to(sampled_dirs[:, None, :], ray_points.shape), ts, rand_ray_coords

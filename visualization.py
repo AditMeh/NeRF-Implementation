@@ -24,11 +24,11 @@ def get_rotation_and_translation(c2w):
 def show_view(c2w, focal, h, w, t_n, t_f, num_samples, chunk, **_):
     with torch.no_grad():
         rot, trans = get_rotation_and_translation(c2w)
-        points, direction = pose_to_rays(
+        points, direction, ts = pose_to_rays(
             rot, trans, focal, h, w, t_n, t_f, num_samples)
 
-        points, dirs = points.to(device), direction.to(device)
-        
+        points, dirs, ts= points.to(device), direction.to(device), ts.to(device)
+                    
         flat_points = points.reshape(-1, 3)
         flat_dirs = dirs.reshape(-1, 3)
         
@@ -38,7 +38,11 @@ def show_view(c2w, focal, h, w, t_n, t_f, num_samples, chunk, **_):
         rgbs, density = torch.reshape(flat_rgbs, points.shape), torch.reshape(flat_density, points.shape[0:-1])
 
         # rendering
-        delta = (t_f - t_n) / num_samples
+        # delta = (hparams.t_f - hparams.t_n) / hparams.num_samples
+            
+        # Change delta to be actual adjacent points
+        delta = ts.roll(shifts=-1,dims=0) - ts
+
         rendered_image = rendering(rgbs, density, delta, device, permute=False)
 
     return rendered_image.detach().cpu().numpy()
