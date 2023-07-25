@@ -127,7 +127,7 @@ class ReplicateNeRFModel(torch.nn.Module):
         x_ = self.relu(self.layer1(xyz))
         x_ = self.relu(self.layer2(x_))
         feat = self.layer3(x_)
-        alpha = self.fc_alpha(x_)
+        alpha = torch.nn.ReLU()(self.fc_alpha(x_))
         
         if self.use_viewdirs:
             y_ = self.relu(self.layer4(torch.cat((feat, direction), dim=-1)))
@@ -135,7 +135,7 @@ class ReplicateNeRFModel(torch.nn.Module):
             y_ = self.relu(self.layer4(feat))
 
         y_ = self.relu(self.layer5(y_))
-        rgb = self.fc_rgb(y_)
+        rgb = torch.nn.Sigmoid()(self.fc_rgb(y_))
 
         return torch.reshape(rgb, position.shape), torch.reshape(alpha, position.shape[0:-1]).unsqueeze(-1)
 
