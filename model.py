@@ -75,6 +75,88 @@ class NerfModel(nn.Module):
 
         return torch.concat(terms, dim=1)
 
+class ReplicateNeRFModel(torch.nn.Module):
+    r"""NeRF model that follows the figure (from the supp. material of NeRF) to
+    every last detail. (ofc, with some flexibility)
+    """
+
+    def __init__(
+        self,
+        hidden_size=256,
+        num_layers=4,
+        num_freqs_xyz=8,
+        num_freqs_dir=6,
+        use_viewdirs=True
+    ):
+        super(ReplicateNeRFModel, self).__init__()
+        
+        self.use_viewdirs = use_viewdirs
+        # xyz_encoding_dims = 3 + 3 * 2 * num_encoding_functions
+        self.num_freqs_xyz = num_freqs_xyz
+        self.num_freqs_dir = num_freqs_dir
+
+        self.dim_xyz = 3 + 2 * 3 * num_freqs_xyz
+        self.dim_dir = 3 + 2 * 3 * num_freqs_dir
+
+        self.layer1 = torch.nn.Linear(self.dim_xyz, hidden_size)
+        self.layer2 = torch.nn.Linear(hidden_size, hidden_size)
+        self.layer3 = torch.nn.Linear(hidden_size, hidden_size)
+        self.fc_alpha = torch.nn.Linear(hidden_size, 1)
+
+        if use_viewdirs == True:
+            self.layer4 = torch.nn.Linear(hidden_size + self.dim_dir, hidden_size // 2)
+        else:
+            self.layer4 = torch.nn.Linear(hidden_size, hidden_size // 2)
+        
+        self.layer5 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
+        self.fc_rgb = torch.nn.Linear(hidden_size // 2, 3)
+        self.relu = torch.nn.functional.relu
+
+    def forward(self, position, dir=None):
+        
+        if len(position.shape) < 3:
+            position = position.reshape(-1, 3)
+
+        xyz = self.positional_encoding(position, self.num_freqs_xyz)
+        
+        if self.use_viewdirs:
+            if len(dir.shape) < 3:  
+                dir = dir.reshape(-1, 3)
+            direction = self.positional_encoding(dir, self.num_freqs_dir)
+        
+        x_ = self.relu(self.layer1(xyz))
+        x_ = self.relu(self.layer2(x_))
+        feat = self.layer3(x_)
+        alpha = torch.nn.ReLU()(self.fc_alpha(x_))
+        
+        if self.use_viewdirs:
+            y_ = self.relu(self.layer4(torch.cat((feat, direction), dim=-1)))
+        else:
+            y_ = self.relu(self.layer4(feat))
+
+        y_ = self.relu(self.layer5(y_))
+        rgb = torch.nn.Sigmoid()(self.fc_rgb(y_))
+
+        return torch.reshape(rgb, position.shape), torch.reshape(alpha, position.shape[0:-1]).unsqueeze(-1)
+
+    @staticmethod
+    def positional_encoding(tensor, num_encoding_functions=6):
+        encoding = [tensor]
+        
+        frequency_bands = 2.0 ** torch.linspace(
+            0.0,
+            num_encoding_functions - 1,    
+            num_encoding_functions,
+            dtype=tensor.dtype,
+            device=tensor.device,
+        )
+
+        for freq in frequency_bands:
+            for func in [torch.sin, torch.cos]:
+                encoding.append(func(tensor * freq))
+
+        # Special case, for no positional encoding
+        return torch.cat(encoding, dim=-1) 
 
 if __name__ == "__main__":
 
