@@ -12,16 +12,18 @@ import torchvision.transforms.functional as F
 
 import json
 
-from utils import pose_to_rays
+from utils import pose_to_rays, pose_to_rays_sampled
 
 
 class BlenderDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset_name, w, h, t_n, t_f, num_samples, mode, **_):
+    def __init__(self, dataset_name, w, h, t_n, t_f, num_samples, num_rays, mode, **_):
 
         self.w = w
         self.h = h
         self.t_n, self.t_f = t_n, t_f
         self.num_samples = num_samples
+        self.num_rays = num_rays
+        self.mode = mode
 
         if dataset_name not in os.listdir("NeRF-Scenes/"):
             logging.error("Invalid dataset name")
@@ -58,8 +60,14 @@ class BlenderDataset(torch.utils.data.Dataset):
 
         R, t = trans_mat[:3, :3], torch.squeeze(trans_mat[:3, 3:])
 
-        rays_points, rays_dirs = pose_to_rays(
-            R, t, self.focal, self.h, self.w, self.t_n, self.t_f, self.num_samples)
+        if self.mode == "train":
+            rays_points, rays_dirs, ts, rand_ray_coords = pose_to_rays_sampled(
+                R, t, self.focal, self.h, self.w, self.t_n, self.t_f, self.num_samples, self.num_rays)
         
-
-        return rays_points, rays_dirs, im
+            return rays_points, rays_dirs, ts, im[:, rand_ray_coords[:, 0], rand_ray_coords[:, 1]]
+        
+        elif self.mode in ["val", "test"]:
+            rays_points, rays_dirs, ts = pose_to_rays(
+                R, t, self.focal, self.h, self.w, self.t_n, self.t_f, self.num_samples)
+            
+            return rays_points, rays_dirs, ts, im

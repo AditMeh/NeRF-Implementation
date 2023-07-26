@@ -1,31 +1,34 @@
 import torch
+import torch.distributed as dist
 
-
-def rendering(color, density, dist_delta, device, permute):
+def rendering(color, density, dist_delta, device, permute, rank = None):
     """
     color: (h, w, num_samples along each ray, 3)
     density: (h, w, num_samples along each ray)
     dist_delta: the distance between the two neighbouring points on a ray, 
                 assume it's constant and a float
     """
-    delta_broadcast = torch.ones(density.shape[-1]) * dist_delta
-    delta_broadcast[-1] = 1e10
-    delta_broadcast = delta_broadcast.to(device=device)
+    
+    if len(density.shape) == 3:
+        density = torch.squeeze(density)
 
-    density_times_delta = density * delta_broadcast
+    dist_delta[-1] = 1e10    
+    density_times_delta = density * dist_delta    
     density_times_delta = density_times_delta.to(device=device)
+    
 
-    dists = torch.ones(density.shape[-1]) * dist_delta
-    dists[-1] = 1e10
-    density_times_delta = density * dist_delta
 
     T = torch.exp(-cumsum_exclusive(density_times_delta))
+    
     # roll T to right by one postion and replace the first column with 1
     S = 1 - torch.exp(-density_times_delta)
     points_color = (T * S)[..., None] * color
     C = torch.sum(points_color, dim=-2)
 
-    return C.permute(2, 0, 1) if permute else C
+    if len(C.shape) == 2:
+        return C.permute(1, 0) if permute else C
+    elif len(C.shape) == 3:
+        return C.permute(2, 0, 1) if permute else C
 
 
 def cumsum_exclusive(t):

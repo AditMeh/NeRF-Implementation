@@ -113,18 +113,21 @@ class ReplicateNeRFModel(torch.nn.Module):
         self.relu = torch.nn.functional.relu
 
     def forward(self, position, dir=None):
-        xyz = position.reshape(-1, 3)
         
-        xyz = self.positional_encoding(xyz, self.num_freqs_xyz)
+        if len(position.shape) < 3:
+            position = position.reshape(-1, 3)
+
+        xyz = self.positional_encoding(position, self.num_freqs_xyz)
         
         if self.use_viewdirs:
-            direction = dir.reshape(-1, 3)
-            direction = self.positional_encoding(direction, self.num_freqs_dir)
+            if len(dir.shape) < 3:  
+                dir = dir.reshape(-1, 3)
+            direction = self.positional_encoding(dir, self.num_freqs_dir)
         
         x_ = self.relu(self.layer1(xyz))
         x_ = self.relu(self.layer2(x_))
         feat = self.layer3(x_)
-        alpha = self.fc_alpha(x_)
+        alpha = torch.nn.ReLU()(self.fc_alpha(x_))
         
         if self.use_viewdirs:
             y_ = self.relu(self.layer4(torch.cat((feat, direction), dim=-1)))
@@ -132,9 +135,9 @@ class ReplicateNeRFModel(torch.nn.Module):
             y_ = self.relu(self.layer4(feat))
 
         y_ = self.relu(self.layer5(y_))
-        rgb = self.fc_rgb(y_)
+        rgb = torch.nn.Sigmoid()(self.fc_rgb(y_))
 
-        return torch.reshape(rgb, position.shape), torch.reshape(alpha, position.shape[0:-1])
+        return torch.reshape(rgb, position.shape), torch.reshape(alpha, position.shape[0:-1]).unsqueeze(-1)
 
     @staticmethod
     def positional_encoding(tensor, num_encoding_functions=6):
