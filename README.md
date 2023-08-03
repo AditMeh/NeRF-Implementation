@@ -6,6 +6,7 @@ Here are some visualization of our NeRF from different view points:
 
 ![e](https://github.com/AditMeh/NeRF-Implementation/blob/main/videos/spining_view.gif)
 ![e](https://github.com/AditMeh/NeRF-Implementation/blob/main/videos/top_view.gif)
+![e](https://github.com/AditMeh/NeRF-Implementation/blob/main/videos/top_view.mp4)
 
 References:
 

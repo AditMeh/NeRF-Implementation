@@ -117,5 +117,5 @@ if __name__ == '__main__':
         # imgs.append(cv2.resize(intermediate, (512, 512)
         imgs.append(intermediate)
         
-    f = f'video_{hparams.use_viewdirs}.mp4'
+    f = f'video_{hparams.use_viewdirs}_{hparams.w}x{hparams.h}.mp4'
     imageio.mimwrite(f, imgs, fps=30, quality=7)
