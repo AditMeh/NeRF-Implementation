@@ -76,7 +76,7 @@ def circle_points(z, radius, num_points):
 
 def batchify(chunk, mlp):
     if chunk is None:
-        return self.mlp
+        return mlp
 
     def process_chunks(xyz, dirs):
         assert len(xyz.shape) == len(dirs.shape)
@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
     # images, poses, focal, w, h = load_data('tiny_nerf_data.npz')
     dataset = BlenderDataset(mode="train", **hparams.__dict__)
-    focal, w, h = dataset.focal, 100, 100
+    focal = dataset.focal
 
     nerf_model = ReplicateNeRFModel(use_viewdirs=hparams.use_viewdirs
                                     ).to(device=device)
