@@ -2,6 +2,14 @@
 
 This repository was worked by Junru Lin and Aditya Mehrotra.
 
+## How to use
+
+`python training.py <config_path> --world_size <world_size>`
+
+You can find some configs in `configs/`
+
+## Visuals
+
 Here are some visualization of our NeRF from different view points:
 
 ![e](https://github.com/AditMeh/NeRF-Implementation/blob/main/videos/video_True_800x800.gif)
