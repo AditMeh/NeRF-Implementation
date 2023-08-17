@@ -1,6 +1,7 @@
 from cmath import sin
-from torch import nn
 import torch
+from torch import nn
+
 
 
 class NerfModel(nn.Module):
